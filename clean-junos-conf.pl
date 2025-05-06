@@ -5,7 +5,7 @@ use warnings;
 
 # Clean JunOS config with support for as-path, as-path-group, community, group, filter structures, and active/inactive handling
 # Author: Pavel Gulchouck <gul@gul.kiev.ua>, Updated by evgenyzh
-# Version 2.24
+# Version 2.25
 # Date: 07.05.2025
 # Free software
 
@@ -216,6 +216,14 @@ sub parse_file {
                             $entities_ref->{"as-path-group:$as_path_group"}{referenced_by} ||= [];
                             push @{$entities_ref->{"as-path-group:$as_path_group"}{referenced_by}}, $key;
                             debug(2, "Dependency: policy-statement $name references as-path-group $as_path_group");
+                        }
+                        if ($entity_line =~ /^\s*from\s+policy\s+(\S+)/) {
+                            my $policy = $1;
+                            $policy =~ s/;$//;
+                            push @{$entities_ref->{$key}{references}}, "policy-statement:$policy";
+                            $entities_ref->{"policy-statement:$policy"}{referenced_by} ||= [];
+                            push @{$entities_ref->{"policy-statement:$policy"}{referenced_by}}, $key;
+                            debug(2, "Dependency: policy-statement $name references policy-statement $policy");
                         }
                         if ($entity_line =~ /^\s*then\s+policy\s+(\S+)/) {
                             my $policy = $1;
