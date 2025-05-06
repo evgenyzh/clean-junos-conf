@@ -5,8 +5,8 @@ use warnings;
 
 # Clean JunOS config with support for as-path, community, group structures, and active/inactive handling
 # Author: Pavel Gulchouck <gul@gul.kiev.ua>, Updated by evgenyzh
-# Version 2.13
-# Date: 05.11.2025
+# Version 2.17
+# Date: 06.05.2025
 # Free software
 
 my $debug = 0;
@@ -134,16 +134,6 @@ sub parse_config {
                             debug(2, "Dependency: group $name references policy-statement $policy");
                         }
                     }
-
-                    # Track community dependencies
-                    if ($group_line =~ /^\s*community\s+(\S+)\s+/) {
-                        my $community = $1;
-                        $community =~ s/;$//;  # Remove trailing semicolon
-                        push @{$entities_ref->{$key}{references}}, "community:$community";
-                        $entities_ref->{"community:$community"}{referenced_by} ||= [];
-                        push @{$entities_ref->{"community:$community"}{referenced_by}}, $key;
-                        debug(2, "Dependency: group $name references community $community");
-                    }
                 }
 
                 if ($brace_level != 0) {
@@ -193,6 +183,8 @@ sub parse_config {
                             if ($entity_line =~ /^\s*from\s+community\s+(\S+)/) {
                                 my $community = $1;
                                 $community =~ s/;$//;  # Remove trailing semicolon
+                                # Skip community arrays like [ 43274:3301 43274:1000 ]
+                                next if $community =~ /^\[.*\]$/;
                                 push @{$entities_ref->{$key}{references}}, "community:$community";
                                 $entities_ref->{"community:$community"}{referenced_by} ||= [];
                                 push @{$entities_ref->{"community:$community"}{referenced_by}}, $key;
@@ -245,6 +237,8 @@ sub parse_config {
             for my $entity_type (qw(as-path community)) {
                 if ($line =~ /^\s*(?:inactive:\s+)?$entity_type\s+(\S+)\s+(.*);\s*$/) {
                     my $name = $1;
+                    # Skip arrays like [ 43274:3301 43274:1000 ]
+                    next if $name =~ /^\[.*\]$/;
                     my $key = "$entity_type:$name";
                     $entities_ref->{$key} = {
                         type => $entity_type,
@@ -473,22 +467,54 @@ sub print_dependency_report {
 sub print_dependency_graph {
     my ($entities_ref) = @_;
 
+    # Define type abbreviations
+    my %type_abbreviations = (
+        'policy-statement' => 'PS',
+        'group' => 'G',
+        'prefix-list' => 'PL',
+        'community' => 'CM',
+        'as-path' => 'AP',
+        'filter' => 'F'
+    );
+
     print "digraph JunOS_Dependencies {\n";
+    print "// Abbreviations: PS - policy-statement, G - group, PL - prefix-list, CM - community, AP - as-path, F - filter\n\n";
+
+    # Collect all referenced entities (even if not in %entities_ref)
+    my %all_nodes;
+    foreach my $key (keys %$entities_ref) {
+        $all_nodes{$key} = 1;
+        foreach my $ref_key (@{$entities_ref->{$key}{references}}) {
+            $all_nodes{$ref_key} = 1;
+        }
+    }
 
     # Print nodes
-    foreach my $key (sort keys %$entities_ref) {
-        my $entity = $entities_ref->{$key};
+    foreach my $key (sort keys %all_nodes) {
+        my ($type, $name) = split(/:/, $key, 2);
+        my $abbr_type = $type_abbreviations{$type} || $type;
+        my $node_label = "$abbr_type:$name";
         my @attributes;
-        push @attributes, 'style=dashed' if $entity->{is_inactive};
-        push @attributes, 'color=blue' if $entity->{is_common};
+        if (exists $entities_ref->{$key}) {
+            push @attributes, 'style=dashed' if $entities_ref->{$key}{is_inactive};
+            push @attributes, 'color=blue' if $entities_ref->{$key}{is_common};
+        } else {
+            push @attributes, 'color=red', 'label="MISSING: ' . $node_label . '"';
+        }
         my $attr_str = @attributes ? " [" . join(",", @attributes) . "]" : "";
-        print "  \"$key\"$attr_str;\n";
+        print "  \"$node_label\"$attr_str;\n";
     }
 
     # Print edges
     foreach my $key (keys %$entities_ref) {
+        my ($type, $name) = split(/:/, $key, 2);
+        my $abbr_type = $type_abbreviations{$type} || $type;
+        my $from_node = "$abbr_type:$name";
         foreach my $ref_key (@{$entities_ref->{$key}{references}}) {
-            print "  \"$key\" -> \"$ref_key\";\n" if exists $entities_ref->{$ref_key};
+            my ($ref_type, $ref_name) = split(/:/, $ref_key, 2);
+            my $abbr_ref_type = $type_abbreviations{$ref_type} || $ref_type;
+            my $to_node = "$abbr_ref_type:$ref_name";
+            print "  \"$from_node\" -> \"$to_node\";\n";
         }
     }
 
