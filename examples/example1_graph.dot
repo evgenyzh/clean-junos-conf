@@ -1,0 +1,10 @@
+digraph JunOS_Dependencies {
+  "group:Group1";
+  "policy-statement:Policy1";
+  "policy-statement:Policy2";
+  "policy-statement:Policy3";
+  "policy-statement:Policy4";
+  "group:Group1" -> "policy-statement:Policy1";
+  "group:Group1" -> "policy-statement:Policy2";
+  "group:Group1" -> "policy-statement:Policy3";
+}

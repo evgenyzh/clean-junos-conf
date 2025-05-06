@@ -1,0 +1,24 @@
+digraph JunOS_Dependencies {
+  "group:Group1";
+  "group:Group2"[style=dashed];
+  "community:Community1"[color=blue];
+  "community:Community2"[color=blue];
+  "policy-statement:Policy1";
+  "policy-statement:Policy2";
+  "policy-statement:Policy3";
+  "policy-statement:Policy4";
+  "policy-statement:Policy5";
+  "policy-statement:Policy6";
+  "policy-statement:Policy7";
+  "policy-statement:Policy8";
+  "group:Group1" -> "policy-statement:Policy1";
+  "group:Group1" -> "policy-statement:Policy2";
+  "group:Group1" -> "policy-statement:Policy3";
+  "group:Group1" -> "policy-statement:Policy4";
+  "group:Group1" -> "policy-statement:Policy5";
+  "group:Group1" -> "policy-statement:Policy6";
+  "group:Group1" -> "policy-statement:Policy7";
+  "group:Group1" -> "policy-statement:Policy8";
+  "policy-statement:Policy5" -> "community:Community1";
+  "policy-statement:Policy5" -> "community:Community2";
+}
